@@ -46,6 +46,17 @@ export async function ensureDbInitialized(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_messages_classroom_created
       ON messages (classroom_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS bad_words (
+      id TEXT PRIMARY KEY,
+      word TEXT NOT NULL,
+      language TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(word, language)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bad_words_language
+      ON bad_words (language);
   `);
 }
 

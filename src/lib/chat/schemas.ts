@@ -52,7 +52,12 @@ export type CreateTextMessageInput = z.infer<typeof CreateTextMessageSchema>;
 
 export function getModerationForCreateInput(
   input: CreateTextMessageInput,
+  badWords: readonly string[],
 ): ModerationResult {
-  return moderateText({ text: input.content.text, language: input.language });
+  return moderateText({
+    text: input.content.text,
+    language: input.language,
+    badWords,
+  });
 }
 
