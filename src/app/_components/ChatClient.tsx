@@ -97,7 +97,10 @@ export function ChatClient() {
     await fetch(`/api/messages/${encodeURIComponent(messageId)}/moderation`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ verdict, flags: [] }),
+      body: JSON.stringify({
+        verdict,
+        flags: verdict === "block" ? ["profanity"] : [],
+      }),
     });
     await refresh();
   }
