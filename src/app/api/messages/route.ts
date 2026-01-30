@@ -4,7 +4,11 @@ import {
   CreateTextMessageSchema,
   getModerationForCreateInput,
 } from "@/lib/chat/schemas";
-import { createTextMessage, listMessages } from "@/lib/chat/repository";
+import {
+  createTextMessage,
+  listBadWords,
+  listMessages,
+} from "@/lib/chat/repository";
 import type { ClassroomId, UserId } from "@/lib/chat/types";
 
 export async function GET(req: Request) {
@@ -40,7 +44,8 @@ export async function POST(req: Request) {
   }
 
   const input = parsed.data;
-  const moderation = getModerationForCreateInput(input);
+  const badWords = await listBadWords(input.language);
+  const moderation = getModerationForCreateInput(input, badWords);
 
   if (moderation.verdict !== "allow") {
     return NextResponse.json(

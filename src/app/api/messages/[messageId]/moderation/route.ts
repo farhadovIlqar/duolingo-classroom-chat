@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { updateMessageModeration } from "@/lib/chat/repository";
+import {
+  addBadWords,
+  getMessageById,
+  updateMessageModeration,
+} from "@/lib/chat/repository";
 import type { MessageId, ModerationFlag } from "@/lib/chat/types";
 
 const UpdateModerationSchema = z.object({
@@ -17,6 +21,7 @@ const UpdateModerationSchema = z.object({
     ]),
   ),
   studentHint: z.string().optional(),
+  wordsToBlock: z.array(z.string().min(1)).optional(),
 });
 
 export async function POST(
@@ -32,6 +37,21 @@ export async function POST(
       { error: "Validation failed", issues: parsed.error.flatten() },
       { status: 400 },
     );
+  }
+
+  const message = await getMessageById(messageId as MessageId);
+  if (!message) {
+    return NextResponse.json({ error: "Message not found" }, { status: 404 });
+  }
+
+  if (parsed.data.verdict === "block") {
+    const wordsToAdd =
+      parsed.data.wordsToBlock && parsed.data.wordsToBlock.length > 0
+        ? parsed.data.wordsToBlock
+        : [message.content.text.trim()].filter(Boolean);
+    if (wordsToAdd.length > 0) {
+      await addBadWords(wordsToAdd, message.language);
+    }
   }
 
   await updateMessageModeration({
