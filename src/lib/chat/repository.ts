@@ -14,6 +14,19 @@ import type {
   UserId,
 } from "@/lib/chat/types";
 
+const INITIAL_BAD_WORDS: Readonly<Record<LanguageCode, readonly string[]>> = {
+  en: ["fuck", "shit", "bitch"],
+  es: ["mierda", "puta"],
+  fr: ["merde", "putain"],
+  ja: ["死ね"],
+  de: ["scheiße"],
+  it: ["merda"],
+  ko: ["씨발"],
+  zh: ["操你妈"],
+  pt: ["merda"],
+  ar: ["لعنة"],
+};
+
 type MessageRow = Readonly<{
   id: string;
   classroom_id: string;
@@ -154,5 +167,78 @@ export async function updateMessageModeration(input: {
       input.messageId,
     ],
   );
+}
+
+export async function getMessageById(messageId: MessageId): Promise<TextMessage | null> {
+  const rows = await dbAll<MessageRow>(
+    `SELECT * FROM messages WHERE id = ?;`,
+    [messageId],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  const flags = JSON.parse(r.moderation_flags) as ModerationFlag[];
+  return {
+    id: r.id as MessageId,
+    classroomId: r.classroom_id as ClassroomId,
+    courseId: r.course_id as CourseId,
+    language: r.language as LanguageCode,
+    authorId: r.author_id as UserId,
+    authorRole: r.author_role as Role,
+    createdAt: r.created_at as IsoDateTime,
+    content: { kind: "text", text: r.content_text },
+    moderation: {
+      verdict: r.moderation_verdict as ModerationResult["verdict"],
+      flags,
+      studentHint: r.moderation_student_hint ?? undefined,
+    },
+  } satisfies TextMessage;
+}
+
+export async function listBadWords(language: LanguageCode): Promise<readonly string[]> {
+  const existing = await dbAll<{ word: string }>(
+    `SELECT word FROM bad_words WHERE language = ? ORDER BY word;`,
+    [language],
+  );
+  if (existing.length > 0) return existing.map((r) => r.word);
+  await seedBadWordsIfEmpty();
+  const rows = await dbAll<{ word: string }>(
+    `SELECT word FROM bad_words WHERE language = ? ORDER BY word;`,
+    [language],
+  );
+  return rows.map((r) => r.word);
+}
+
+async function seedBadWordsIfEmpty(): Promise<void> {
+  const count = await dbAll<{ n: number }>(
+    `SELECT COUNT(*) as n FROM bad_words;`,
+    [],
+  );
+  if (count[0].n > 0) return;
+  const now = nowIso();
+  for (const [lang, words] of Object.entries(INITIAL_BAD_WORDS)) {
+    for (const word of words) {
+      const id = crypto.randomUUID();
+      await dbRun(
+        `INSERT OR IGNORE INTO bad_words (id, word, language, created_at) VALUES (?, ?, ?, ?);`,
+        [id, word, lang, now],
+      );
+    }
+  }
+}
+
+export async function addBadWords(
+  words: readonly string[],
+  language: LanguageCode,
+): Promise<void> {
+  const now = nowIso();
+  for (const word of words) {
+    const trimmed = word.trim();
+    if (!trimmed) continue;
+    const id = crypto.randomUUID();
+    await dbRun(
+      `INSERT OR IGNORE INTO bad_words (id, word, language, created_at) VALUES (?, ?, ?, ?);`,
+      [id, trimmed, language, now],
+    );
+  }
 }
 
