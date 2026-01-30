@@ -5,35 +5,40 @@ import type {
   ModerationVerdict,
 } from "@/lib/chat/types";
 
-const BANNED_PATTERNS: Record<LanguageCode, readonly RegExp[]> = {
-  en: [/\b(fuck|shit|bitch)\b/i],
-  es: [/\b(mierda|puta)\b/i],
-  fr: [/\b(merde|putain)\b/i],
-  ja: [/(死ね)/],
-  de: [/\b(scheiße)\b/i],
-  it: [/\b(merda)\b/i],
-  ko: [/(씨발)/],
-  zh: [/(操你妈)/],
-  pt: [/\b(merda)\b/i],
-  ar: [/(لعنة)/],
-};
-
 const PERSONAL_INFO_PATTERNS: readonly RegExp[] = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /\b(\+?\d[\d\s().-]{7,}\d)\b/,
 ];
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildBadWordsRegex(singleWords: readonly string[]): RegExp | null {
+  if (singleWords.length === 0) return null;
+  const escaped = singleWords.map(escapeRegex).join("|");
+  return new RegExp(`\\b(${escaped})\\b`, "i");
+}
+
+function containsPhrase(text: string, phrase: string): boolean {
+  return text.toLowerCase().includes(phrase.toLowerCase());
+}
+
 export function moderateText(input: {
   text: string;
   language: LanguageCode;
+  badWords: readonly string[];
 }): ModerationResult {
   const text = input.text;
-  const language = input.language;
 
   const flags: ModerationFlag[] = [];
 
-  const banned = BANNED_PATTERNS[language] ?? [];
-  if (banned.some((re) => re.test(text))) flags.push("profanity");
+  const singleWords = input.badWords.filter((w) => !w.includes(" "));
+  const phrases = input.badWords.filter((w) => w.includes(" "));
+
+  const bannedRe = buildBadWordsRegex(singleWords);
+  if (bannedRe?.test(text)) flags.push("profanity");
+  if (phrases.some((p) => containsPhrase(text, p))) flags.push("profanity");
   if (PERSONAL_INFO_PATTERNS.some((re) => re.test(text)))
     flags.push("personal_info");
 
