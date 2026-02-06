@@ -1,39 +1,49 @@
-"use client";
+"use client"
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 
-import { CourseIdSchema, LanguageCodeSchema, RoleSchema } from "@/lib/chat/schemas";
-import type { ModerationVerdict } from "@/lib/chat/types";
-import type { TextMessage } from "@/lib/chat/types";
+import {
+  CourseIdSchema,
+  LanguageCodeSchema,
+  RoleSchema,
+} from "@/lib/chat/schemas"
+import type { ModerationVerdict } from "@/lib/chat/types"
+import type { TextMessage } from "@/lib/chat/types"
+import Link from "next/link"
 
 const ChatFormSchema = z.object({
   courseId: CourseIdSchema,
   language: LanguageCodeSchema,
   authorRole: RoleSchema,
   text: z.string().min(1, "Type a message.").max(500, "Max 500 characters."),
-});
+})
 
-type ChatFormValues = z.infer<typeof ChatFormSchema>;
+type ChatFormValues = z.infer<typeof ChatFormSchema>
 
 type ApiError =
   | { error: string; moderation?: { studentHint?: string } }
-  | { error: string; issues: unknown };
+  | { error: string; issues: unknown }
 
 export function ChatClient() {
-  const classroomId = "demo-classroom";
-  const authorId = "demo-user";
+  const classroomId = "demo-classroom"
+  const authorId = "demo-user"
 
-  const [messages, setMessages] = useState<readonly TextMessage[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<readonly TextMessage[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const defaults = useMemo<ChatFormValues>(
-    () => ({ courseId: "spanish", language: "en", authorRole: "student", text: "" }),
+    () => ({
+      courseId: "spanish",
+      language: "en",
+      authorRole: "student",
+      text: "",
+    }),
     [],
-  );
+  )
 
   const {
     register,
@@ -44,24 +54,27 @@ export function ChatClient() {
   } = useForm<ChatFormValues>({
     resolver: zodResolver(ChatFormSchema),
     defaultValues: defaults,
-  });
-  const currentRole = watch("authorRole");
+  })
+  const currentRole = watch("authorRole")
 
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/messages?classroomId=${encodeURIComponent(classroomId)}`, {
-      cache: "no-store",
-    });
-    const data = (await res.json()) as { messages: TextMessage[] };
-    setMessages(data.messages);
-  }, [classroomId]);
+    const res = await fetch(
+      `/api/messages?classroomId=${encodeURIComponent(classroomId)}`,
+      {
+        cache: "no-store",
+      },
+    )
+    const data = (await res.json()) as { messages: TextMessage[] }
+    setMessages(data.messages)
+  }, [classroomId])
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void refresh()
+  }, [refresh])
 
   const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
-    setSubmitting(true);
+    setFormError(null)
+    setSubmitting(true)
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
@@ -74,24 +87,24 @@ export function ChatClient() {
           authorRole: values.authorRole,
           content: { kind: "text", text: values.text },
         }),
-      });
+      })
 
       if (!res.ok) {
-        const err = (await res.json()) as ApiError;
+        const err = (await res.json()) as ApiError
         const hint =
           "moderation" in err && err.moderation?.studentHint
             ? ` ${err.moderation.studentHint}`
-            : "";
-        setFormError(`${err.error}.${hint}`);
-        return;
+            : ""
+        setFormError(`${err.error}.${hint}`)
+        return
       }
 
-      reset({ ...values, text: "" });
-      await refresh();
+      reset({ ...values, text: "" })
+      await refresh()
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  });
+  })
 
   async function setVerdict(messageId: string, verdict: ModerationVerdict) {
     await fetch(`/api/messages/${encodeURIComponent(messageId)}/moderation`, {
@@ -101,8 +114,8 @@ export function ChatClient() {
         verdict,
         flags: verdict === "block" ? ["profanity"] : [],
       }),
-    });
-    await refresh();
+    })
+    await refresh()
   }
 
   return (
@@ -165,13 +178,27 @@ export function ChatClient() {
               {...register("text")}
             />
             {errors.text?.message ? (
-              <span className="text-sm text-red-600">{errors.text.message}</span>
+              <span className="text-sm text-red-600">
+                {errors.text.message}
+              </span>
             ) : null}
           </label>
 
           {formError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {formError}
+            <div>
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </div>
+              <div>
+                <div
+                  className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm cursor-pointer"
+                  onClick={() => {
+                    console.log("s")
+                  }}
+                >
+                  {/* TODO: Bura AI button qoy */}TEST
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -197,7 +224,9 @@ export function ChatClient() {
       <section className="rounded-xl border border-neutral-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-neutral-700">Messages</h2>
-          <span className="text-xs text-neutral-500">{messages.length} total</span>
+          <span className="text-xs text-neutral-500">
+            {messages.length} total
+          </span>
         </div>
 
         <ul className="flex flex-col gap-3">
@@ -205,7 +234,9 @@ export function ChatClient() {
             <li key={m.id} className="rounded-lg border border-neutral-100 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs text-neutral-500">
-                  <span className="font-medium text-neutral-700">{m.authorRole}</span>{" "}
+                  <span className="font-medium text-neutral-700">
+                    {m.authorRole}
+                  </span>{" "}
                   · {m.language} · {m.courseId}
                 </div>
                 <div className="text-xs text-neutral-500">
@@ -260,6 +291,5 @@ export function ChatClient() {
         </ul>
       </section>
     </div>
-  );
+  )
 }
-
