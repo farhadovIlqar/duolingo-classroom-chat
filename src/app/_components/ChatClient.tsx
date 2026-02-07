@@ -13,6 +13,7 @@ import {
 import type { ModerationVerdict } from "@/lib/chat/types"
 import type { TextMessage } from "@/lib/chat/types"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 const ChatFormSchema = z.object({
   courseId: CourseIdSchema,
@@ -24,7 +25,11 @@ const ChatFormSchema = z.object({
 type ChatFormValues = z.infer<typeof ChatFormSchema>
 
 type ApiError =
-  | { error: string; moderation?: { studentHint?: string } }
+  | {
+      error: string
+      moderation?: { studentHint?: string }
+      canAskWhy?: boolean
+    }
   | { error: string; issues: unknown }
 
 export function ChatClient() {
@@ -34,6 +39,8 @@ export function ChatClient() {
   const [messages, setMessages] = useState<readonly TextMessage[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [canAskWhy, setCanAskWhy] = useState(false)
+  const [blockedText, setBlockedText] = useState<string | null>(null)
 
   const defaults = useMemo<ChatFormValues>(
     () => ({
@@ -56,6 +63,7 @@ export function ChatClient() {
     defaultValues: defaults,
   })
   const currentRole = watch("authorRole")
+  const currentLanguage = watch("language")
 
   const refresh = useCallback(async () => {
     const res = await fetch(
@@ -96,10 +104,16 @@ export function ChatClient() {
             ? ` ${err.moderation.studentHint}`
             : ""
         setFormError(`${err.error}.${hint}`)
+        if ("canAskWhy" in err && err.canAskWhy) {
+          setCanAskWhy(true)
+          setBlockedText(values.text)
+        }
         return
       }
 
       reset({ ...values, text: "" })
+      setCanAskWhy(false)
+      setBlockedText(null)
       await refresh()
     } finally {
       setSubmitting(false)
@@ -116,6 +130,17 @@ export function ChatClient() {
       }),
     })
     await refresh()
+  }
+
+  const router = useRouter()
+
+  const handleAskWhy = () => {
+    if (blockedText) {
+      const params = new URLSearchParams()
+      params.set("q", blockedText) // passing the blocked text as query
+      params.set("lang", currentLanguage)
+      router.push(`/chat?${params.toString()}`)
+    }
   }
 
   return (
@@ -169,7 +194,6 @@ export function ChatClient() {
               </select>
             </label>
           </div>
-
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-neutral-700">Message</span>
             <textarea
@@ -183,25 +207,27 @@ export function ChatClient() {
               </span>
             ) : null}
           </label>
-
           {formError ? (
             <div>
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {formError}
               </div>
-              <div>
-                <div
-                  className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm cursor-pointer"
-                  onClick={() => {
-                    console.log("s")
-                  }}
-                >
-                  {/* TODO: Bura AI button qoy */}TEST
+              {canAskWhy ? (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    onClick={handleAskWhy}
+                  >
+                    <span>Why?</span>
+                    <span className="text-xs font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+                      ✧ Gemini
+                    </span>
+                  </button>
                 </div>
-              </div>
+              ) : null}
             </div>
           ) : null}
-
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
