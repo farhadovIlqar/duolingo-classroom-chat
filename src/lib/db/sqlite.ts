@@ -1,32 +1,32 @@
-import "server-only";
+import "server-only"
 
-import path from "node:path";
-import { promisify } from "node:util";
-import sqlite3 from "sqlite3";
+import path from "node:path"
+import { promisify } from "node:util"
+import sqlite3 from "sqlite3"
 
-const DB_FILE = path.join(process.cwd(), "data", "chat.sqlite3");
+const DB_FILE = path.join(process.cwd(), "data", "chat.sqlite3")
 
-type SqliteDatabase = sqlite3.Database;
+type SqliteDatabase = sqlite3.Database
 
 declare global {
-  var __db: SqliteDatabase | undefined;
+  var __db: SqliteDatabase | undefined
 }
 
 function openDb(): SqliteDatabase {
-  if (globalThis.__db) return globalThis.__db;
+  if (globalThis.__db) return globalThis.__db
 
-  const db = new sqlite3.Database(DB_FILE);
-  db.exec("PRAGMA foreign_keys = ON;");
-  globalThis.__db = db;
-  return db;
+  const db = new sqlite3.Database(DB_FILE)
+  db.exec("PRAGMA foreign_keys = ON;")
+  globalThis.__db = db
+  return db
 }
 
 export async function ensureDbInitialized(): Promise<void> {
-  const fs = await import("node:fs/promises");
-  await fs.mkdir(path.dirname(DB_FILE), { recursive: true });
+  const fs = await import("node:fs/promises")
+  await fs.mkdir(path.dirname(DB_FILE), { recursive: true })
 
-  const db = openDb();
-  const exec = promisify(db.exec.bind(db)) as (sql: string) => Promise<void>;
+  const db = openDb()
+  const exec = promisify(db.exec.bind(db)) as (sql: string) => Promise<void>
 
   await exec(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -57,32 +57,39 @@ export async function ensureDbInitialized(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_bad_words_language
       ON bad_words (language);
-  `);
+
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id TEXT PRIMARY KEY,
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL,
+      output_tokens INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `)
 }
 
 export async function dbAll<T>(
   sql: string,
   params: readonly unknown[] = [],
 ): Promise<readonly T[]> {
-  await ensureDbInitialized();
-  const db = openDb();
+  await ensureDbInitialized()
+  const db = openDb()
   const all = promisify(db.all.bind(db)) as (
     sql2: string,
     params2: readonly unknown[],
-  ) => Promise<T[]>;
-  return all(sql, params);
+  ) => Promise<T[]>
+  return all(sql, params)
 }
 
 export async function dbRun(
   sql: string,
   params: readonly unknown[] = [],
 ): Promise<void> {
-  await ensureDbInitialized();
-  const db = openDb();
+  await ensureDbInitialized()
+  const db = openDb()
   const run = promisify(db.run.bind(db)) as (
     sql2: string,
     params2: readonly unknown[],
-  ) => Promise<unknown>;
-  await run(sql, params);
+  ) => Promise<unknown>
+  await run(sql, params)
 }
-
