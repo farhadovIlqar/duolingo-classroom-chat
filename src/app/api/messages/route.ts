@@ -1,60 +1,58 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
 
 import {
   CreateTextMessageSchema,
   getModerationForCreateInput,
-} from "@/lib/chat/schemas";
+} from "@/lib/chat/schemas"
 import {
   createTextMessage,
   listBadWords,
   listMessages,
-} from "@/lib/chat/repository";
-import type { ClassroomId, UserId } from "@/lib/chat/types";
+} from "@/lib/chat/repository"
+import type { ClassroomId, UserId } from "@/lib/chat/types"
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const classroomId = url.searchParams.get("classroomId") ?? "demo-classroom";
-  const limitParam = url.searchParams.get("limit");
-  const limit = limitParam ? Number(limitParam) : undefined;
+  const url = new URL(req.url)
+  const classroomId = url.searchParams.get("classroomId") ?? "demo-classroom"
+  const limitParam = url.searchParams.get("limit")
+  const limit = limitParam ? Number(limitParam) : undefined
 
   if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0)) {
-    return NextResponse.json(
-      { error: "Invalid limit" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid limit" }, { status: 400 })
   }
 
   const messages = await listMessages(
     limit === undefined
       ? { classroomId: classroomId as ClassroomId }
       : { classroomId: classroomId as ClassroomId, limit },
-  );
+  )
 
-  return NextResponse.json({ messages });
+  return NextResponse.json({ messages })
 }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  const parsed = CreateTextMessageSchema.safeParse(body);
+  const body = await req.json().catch(() => null)
+  const parsed = CreateTextMessageSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.flatten() },
       { status: 400 },
-    );
+    )
   }
 
-  const input = parsed.data;
-  const badWords = await listBadWords(input.language);
-  const moderation = getModerationForCreateInput(input, badWords);
+  const input = parsed.data
+  const badWords = await listBadWords(input.language)
+  const moderation = getModerationForCreateInput(input, badWords)
 
   if (moderation.verdict !== "allow") {
     return NextResponse.json(
       {
         error: "Message blocked by classroom safety filter",
         moderation,
+        canAskWhy: true,
       },
       { status: 400 },
-    );
+    )
   }
 
   const message = await createTextMessage({
@@ -65,8 +63,7 @@ export async function POST(req: Request) {
     authorRole: input.authorRole,
     text: input.content.text,
     moderation,
-  });
+  })
 
-  return NextResponse.json({ message }, { status: 201 });
+  return NextResponse.json({ message }, { status: 201 })
 }
-
